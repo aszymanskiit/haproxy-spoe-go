@@ -47,7 +47,7 @@ func (kv *KV) Data() []Item {
 }
 
 func (kv *KV) Reset() {
-	kv.m = make([]Item, 0)
+	kv.m = kv.m[:0]
 }
 
 func (kv *KV) Add(key string, value interface{}) {
@@ -69,6 +69,9 @@ func (kv *KV) Bytes() ([]byte, error) {
 
 	for _, item := range kv.m {
 		n := varint.PutUvarint(kv.tmp, uint64(len(item.Name)))
+		if n <= 0 {
+			return nil, fmt.Errorf("error encode KV key length")
+		}
 		buf = append(buf, kv.tmp[:n]...)
 		buf = append(buf, item.Name...)
 
@@ -96,8 +99,11 @@ func (kv *KV) Unmarshal(buf []byte) error {
 		}
 
 		keyLen, n = varint.Uvarint(buf)
+		if n <= 0 {
+			return fmt.Errorf("error unmarshal KV key length: truncated varint")
+		}
 		buf = buf[n:]
-		if len(buf) < int(keyLen) {
+		if keyLen > uint64(len(buf)) {
 			return fmt.Errorf("error unmarshal KV, wrong buf len. Expect %d, got %d", keyLen, len(buf))
 		}
 
@@ -108,6 +114,9 @@ func (kv *KV) Unmarshal(buf []byte) error {
 		if err != nil {
 			return err
 		}
+		if n <= 0 || n > len(buf) {
+			return fmt.Errorf("error unmarshal KV value: invalid byte count %d", n)
+		}
 		buf = buf[n:]
 
 		kv.m = append(kv.m, Item{key, value})
@@ -117,6 +126,10 @@ func (kv *KV) Unmarshal(buf []byte) error {
 }
 
 func (kv *KV) UnmarshalNB(buf []byte, count int) (int, error) {
+	if count < 0 {
+		return 0, fmt.Errorf("negative kv count")
+	}
+
 	var key string
 	var value interface{}
 	var n int
@@ -131,9 +144,12 @@ func (kv *KV) UnmarshalNB(buf []byte, count int) (int, error) {
 		}
 
 		keyLen, n = varint.Uvarint(buf)
+		if n <= 0 {
+			return readBytes, fmt.Errorf("error unmarshal KV key length: truncated varint")
+		}
 		buf = buf[n:]
 		readBytes += n
-		if len(buf) < int(keyLen) {
+		if keyLen > uint64(len(buf)) {
 			return readBytes, fmt.Errorf("error unmarshal KV, wrong buf len. Expect %d, got %d", keyLen, len(buf))
 		}
 
@@ -144,6 +160,9 @@ func (kv *KV) UnmarshalNB(buf []byte, count int) (int, error) {
 		value, n, err = typeddata.Decode(buf)
 		if err != nil {
 			return readBytes, err
+		}
+		if n <= 0 || n > len(buf) {
+			return readBytes, fmt.Errorf("error unmarshal KV value: invalid byte count %d", n)
 		}
 		buf = buf[n:]
 		readBytes += n

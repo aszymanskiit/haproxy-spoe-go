@@ -147,43 +147,75 @@ func Decode(buf []byte) (data interface{}, n int, err error) {
 
 	case TypeInt32:
 		i, l := varint.Uvarint(buf)
+		if l <= 0 {
+			err = ErrDecodingBufferTooSmall
+			return
+		}
 		n += l
 		data = int32(i)
 		return
 
 	case TypeUInt32:
 		i, l := varint.Uvarint(buf)
+		if l <= 0 {
+			err = ErrDecodingBufferTooSmall
+			return
+		}
 		n += l
 		data = uint32(i)
 		return
 
 	case TypeInt64:
 		i, l := varint.Uvarint(buf)
+		if l <= 0 {
+			err = ErrDecodingBufferTooSmall
+			return
+		}
 		n += l
 		data = int64(i)
 		return
 
 	case TypeUInt64:
 		i, l := varint.Uvarint(buf)
+		if l <= 0 {
+			err = ErrDecodingBufferTooSmall
+			return
+		}
 		n += l
 		data = uint64(i)
 		return
 
 	case TypeIPv4:
-		data = net.IP(buf[:4])
+		if len(buf) < 4 {
+			err = ErrDecodingBufferTooSmall
+			return
+		}
+		ip := make(net.IP, 4)
+		copy(ip, buf[:4])
+		data = ip
 		n += 4
 		return
 
 	case TypeIPv6:
-		data = net.IP(buf[:16])
+		if len(buf) < 16 {
+			err = ErrDecodingBufferTooSmall
+			return
+		}
+		ip := make(net.IP, 16)
+		copy(ip, buf[:16])
+		data = ip
 		n += 16
 		return
 
 	case TypeString:
 		sLen, i := varint.Uvarint(buf)
+		if i <= 0 {
+			err = ErrDecodingBufferTooSmall
+			return
+		}
 		n += i
 		buf = buf[i:]
-		if len(buf) < int(sLen) {
+		if sLen > uint64(len(buf)) {
 			err = ErrDecodingBufferTooSmall
 			return
 		}
@@ -193,13 +225,20 @@ func Decode(buf []byte) (data interface{}, n int, err error) {
 
 	case TypeBinary:
 		dataLen, i := varint.Uvarint(buf)
-		n += i
-		buf = buf[i:]
-		if len(buf) < int(dataLen) {
+		if i <= 0 {
 			err = ErrDecodingBufferTooSmall
 			return
 		}
-		data = buf[:dataLen]
+		n += i
+		buf = buf[i:]
+		if dataLen > uint64(len(buf)) {
+			err = ErrDecodingBufferTooSmall
+			return
+		}
+		// Copy so callers do not retain aliases into the frame buffer.
+		b := make([]byte, int(dataLen))
+		copy(b, buf[:dataLen])
+		data = b
 		n += int(dataLen)
 		return
 	}

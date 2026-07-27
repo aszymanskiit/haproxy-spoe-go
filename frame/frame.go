@@ -79,6 +79,12 @@ func (f *Frame) Reset() {
 	f.Actions = nil
 	f.Messages.Reset()
 	f.KV.Reset()
+
+	// Drop oversized read buffers so a single large (but allowed) frame does
+	// not permanently retain memory in the global pool.
+	if cap(f.readBuf) > maxRetainedReadBufCap {
+		f.readBuf = nil
+	}
 }
 
 // IsFin returns true, if frame has flag 'FIN'

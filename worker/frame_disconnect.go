@@ -1,37 +1,32 @@
 package worker
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/negasus/haproxy-spoe-go/frame"
 )
 
-func (w *worker) sendAgentDisconnect(f *frame.Frame, statusCode uint32, message string) error {
-	var frameSize, n int
-	var err error
-
+func (w *worker) sendAgentDisconnect(streamID, frameID uint64, statusCode uint32, message string) error {
 	agentDisconnectFrame := frame.AcquireFrame()
 	defer frame.ReleaseFrame(agentDisconnectFrame)
 
 	agentDisconnectFrame.Type = frame.TypeAgentDisconnect
-	agentDisconnectFrame.FrameID = f.FrameID
-	agentDisconnectFrame.StreamID = f.StreamID
+	agentDisconnectFrame.FrameID = frameID
+	agentDisconnectFrame.StreamID = streamID
+
+	// Keep the disconnect message short so the disconnect frame itself stays
+	// within the current max-frame-size (local limit before negotiation, or
+	// negotiated afterwards)
+	const maxMsgLen = 64
+	if len(message) > maxMsgLen {
+		message = message[:maxMsgLen]
+	}
+
 	agentDisconnectFrame.KV.Add("status-code", statusCode)
 	agentDisconnectFrame.KV.Add("message", message)
 
-	buf := &bytes.Buffer{}
-	frameSize, err = agentDisconnectFrame.Encode(buf)
-	if err != nil {
-		return err
-	}
-
-	n, err = w.conn.Write(buf.Bytes())
-	if err != nil {
-		return err
-	}
-	if n != frameSize {
-		return fmt.Errorf("write unexpected bytes count %d, expect %d", n, frameSize)
+	if err := w.writeFrame(agentDisconnectFrame); err != nil {
+		return fmt.Errorf("error write AgentDisconnect: %w", err)
 	}
 
 	return nil
