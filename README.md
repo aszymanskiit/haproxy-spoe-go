@@ -6,7 +6,7 @@ Go library implementing a **SPOA** (Stream Processing Offload Agent) for
 [![CI](https://github.com/aszymanskiit/haproxy-spoe-go/actions/workflows/ci.yml/badge.svg)](https://github.com/aszymanskiit/haproxy-spoe-go/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/aszymanskiit/haproxy-spoe-go)](https://goreportcard.com/report/github.com/aszymanskiit/haproxy-spoe-go)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Go](https://img.shields.io/badge/Go-%3E%3D%201.19-00ADD8?logo=go)](go.mod)
+[![Go](https://img.shields.io/badge/Go-%3E%3D%201.25-00ADD8?logo=go)](go.mod)
 
 ## Maintenance status / fork notice
 
@@ -86,7 +86,7 @@ Based on the current code:
 
 | Requirement | Notes |
 | --- | --- |
-| Go | **1.19+** (`go` directive in [`go.mod`](go.mod)). CI tests 1.19, oldstable, and stable. |
+| Go | **1.25+** (`go` directive in [`go.mod`](go.mod)). CI tests 1.25, oldstable, and stable. |
 | HAProxy | Any HAProxy build that supports SPOE/SPOP as documented in the SPOE spec. This repository does **not** run HAProxy in CI; validate against your HAProxy version in staging. |
 | OS | Portable Go networking (Linux/macOS/Windows). Developed and CI-tested on Linux. |
 | Docker | Not required; no Docker assets are shipped. |
@@ -206,6 +206,8 @@ probe guidance.
 
 ## Development
 
+Requires **Go 1.25+** (see [`go.mod`](go.mod)).
+
 ```bash
 git clone https://github.com/aszymanskiit/haproxy-spoe-go.git
 cd haproxy-spoe-go
@@ -244,7 +246,7 @@ suite in this repository.
 
 | Area | Status |
 | --- | --- |
-| Go | Declared `go 1.19`; verified in development/CI against 1.19 through current stable toolchains |
+| Go | Declared `go 1.25`; verified in development/CI against 1.25 through current stable toolchains |
 | SPOP | Agent hello advertises version `2.0` |
 | HAProxy | Compatible with SPOE as specified; not pinned to a single HAProxy release in CI |
 | Upstream API | Import path preserved; see fork notice for behavioural/security differences |
