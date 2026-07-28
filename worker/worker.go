@@ -5,15 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand/v2"
+	"math/rand"
 	"net"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/negasus/haproxy-spoe-go/frame"
-	"github.com/negasus/haproxy-spoe-go/logger"
-	"github.com/negasus/haproxy-spoe-go/request"
+	"github.com/aszymanskiit/haproxy-spoe-go/frame"
+	"github.com/aszymanskiit/haproxy-spoe-go/logger"
+	"github.com/aszymanskiit/haproxy-spoe-go/request"
 )
 
 const (
@@ -139,6 +139,8 @@ func (w *worker) run() error {
 		close(w.writeCh)
 		<-writerDone
 		w.close()
+
+		w.logger.Errorf("worker closed connection")
 	}()
 
 	var f *frame.Frame
@@ -158,6 +160,7 @@ func (w *worker) run() error {
 			frame.ReleaseFrame(f)
 
 			if w.ready && w.isConnectionLifetimeExceeded(err) {
+
 				if err := w.sendAgentDisconnect(0, 0, statusNormal, "max connection lifetime reached"); err != nil {
 					return fmt.Errorf("error send AgentDisconnect frame: %w", err)
 				}
@@ -204,14 +207,9 @@ func (w *worker) isConnectionLifetimeExceeded(err error) bool {
 	if w.disconnectAt.IsZero() || time.Now().Before(w.disconnectAt) {
 		return false
 	}
-	// Deadline may fire mid-frame: ReadWithLimit can return a timeout error
-	// (clean case) or io.ErrUnexpectedEOF / io.EOF if bufio already buffered
-	// a partial frame header before the deadline was reached.
+
 	var netErr net.Error
-	if errors.As(err, &netErr) && netErr.Timeout() {
-		return true
-	}
-	return errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF)
+	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
 func jitteredMaxConnectionDuration(base time.Duration) time.Duration {
@@ -219,7 +217,8 @@ func jitteredMaxConnectionDuration(base time.Duration) time.Duration {
 		return 0
 	}
 
-	extra := time.Duration(rand.Int64N(int64(base*30/100) + 1))
+	maxExtra := base / 10 * 3
+	extra := time.Duration(rand.Int63n(int64(maxExtra) + 1))
 
 	return base + extra
 }

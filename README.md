@@ -180,10 +180,11 @@ go run ./examples/ip-reputation
 Custom local frame limit and connection rotation (optional):
 
 ```go
-a, err := agent.NewWithOptions(handler, logger.NewDefaultLog(), agent.Options{
+a, err := agent.NewWithOptions(handler, agent.Options{
 	MaxFrameSize: 16380, // 0 selects default 16380; must be >= 256 if set
 	// Keep connection for at least 2m, plus random jitter up to +30%.
 	MaxConnectionDuration: 2 * time.Minute,
+  Logger: logger.NewDefaultLog(),
 })
 ```
 

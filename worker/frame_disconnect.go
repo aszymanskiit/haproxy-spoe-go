@@ -2,8 +2,9 @@ package worker
 
 import (
 	"fmt"
+	"time"
 
-	"github.com/negasus/haproxy-spoe-go/frame"
+	"github.com/aszymanskiit/haproxy-spoe-go/frame"
 )
 
 func (w *worker) processHaproxyDisconnect(f *frame.Frame) error {
@@ -21,6 +22,13 @@ func (w *worker) processHaproxyDisconnect(f *frame.Frame) error {
 }
 
 func (w *worker) sendAgentDisconnect(streamID, frameID uint64, statusCode uint32, message string) error {
+	defer func() {
+		// force connection close
+		if err := w.conn.SetReadDeadline(time.Now()); err != nil {
+			w.logger.Errorf("set read deadline: %v", err)
+		}
+	}()
+
 	agentDisconnectFrame := frame.AcquireFrame()
 	defer frame.ReleaseFrame(agentDisconnectFrame)
 

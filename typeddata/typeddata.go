@@ -6,7 +6,7 @@ import (
 	"net"
 	"reflect"
 
-	"github.com/negasus/haproxy-spoe-go/varint"
+	"github.com/aszymanskiit/haproxy-spoe-go/varint"
 )
 
 const (

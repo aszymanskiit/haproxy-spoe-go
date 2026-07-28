@@ -3,7 +3,7 @@ package worker
 import (
 	"fmt"
 
-	"github.com/negasus/haproxy-spoe-go/frame"
+	"github.com/aszymanskiit/haproxy-spoe-go/frame"
 )
 
 func (w *worker) processHaproxyHello(haproxyHello *frame.Frame) (bool, error) {

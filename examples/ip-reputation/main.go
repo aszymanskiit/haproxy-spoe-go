@@ -5,26 +5,31 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"time"
 
-	"github.com/negasus/haproxy-spoe-go/action"
-	"github.com/negasus/haproxy-spoe-go/agent"
-	"github.com/negasus/haproxy-spoe-go/logger"
-	"github.com/negasus/haproxy-spoe-go/request"
+	"github.com/aszymanskiit/haproxy-spoe-go/action"
+	"github.com/aszymanskiit/haproxy-spoe-go/agent"
+	"github.com/aszymanskiit/haproxy-spoe-go/logger"
+	"github.com/aszymanskiit/haproxy-spoe-go/request"
 )
 
 // Example SPOA from HAProxy SPOE specification section 2.5 (IP reputation).
 // Pair with the HAProxy / SPOE configs in this directory.
 func main() {
-	log.Print("listen 127.0.0.1:3000")
+	log.Print("App listening on port 3000")
 
-	listener, err := net.Listen("tcp4", "127.0.0.1:3000")
+	listener, err := net.Listen("tcp4", ":3000")
 	if err != nil {
 		log.Printf("error create listener: %v", err)
 		os.Exit(1)
 	}
 	defer func() { _ = listener.Close() }()
 
-	a := agent.New(handler, logger.NewDefaultLog())
+	a, err := agent.NewWithOptions(handler, agent.Options{Logger: logger.NewDefaultLog(), MaxConnectionDuration: 10 * time.Second})
+	if err != nil {
+		log.Printf("error create agent: %v", err)
+		os.Exit(1)
+	}
 
 	if err := a.Serve(listener); err != nil {
 		log.Printf("error agent serve: %v", err)
@@ -59,5 +64,5 @@ func handler(req *request.Request) {
 	ipScore := rand.Intn(100)
 	log.Printf("IP: %s, send score %d", ip.String(), ipScore)
 
-	req.Actions.SetVar(action.ScopeSession, "ip_score", ipScore)
+	req.Actions.SetVar(action.ScopeTransaction, "ip_score", ipScore)
 }

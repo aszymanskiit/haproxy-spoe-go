@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/negasus/haproxy-spoe-go/frame"
-	"github.com/negasus/haproxy-spoe-go/logger"
-	"github.com/negasus/haproxy-spoe-go/request"
+	"github.com/aszymanskiit/haproxy-spoe-go/frame"
+	"github.com/aszymanskiit/haproxy-spoe-go/logger"
+	"github.com/aszymanskiit/haproxy-spoe-go/request"
 )
 
 func TestNew_DefaultMaxFrameSize(t *testing.T) {
@@ -17,14 +17,14 @@ func TestNew_DefaultMaxFrameSize(t *testing.T) {
 }
 
 func TestNewWithOptions_RejectsInvalid(t *testing.T) {
-	_, err := NewWithOptions(func(*request.Request) {}, logger.NewNop(), Options{MaxFrameSize: 10})
+	_, err := NewWithOptions(func(*request.Request) {}, Options{Logger: logger.NewNop(), MaxFrameSize: 10})
 	if err == nil {
 		t.Fatal("expected error for too-small MaxFrameSize")
 	}
 }
 
 func TestNewWithOptions_ZeroMeansDefault(t *testing.T) {
-	a, err := NewWithOptions(func(*request.Request) {}, logger.NewNop(), Options{})
+	a, err := NewWithOptions(func(*request.Request) {}, Options{Logger: logger.NewNop(), MaxFrameSize: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,8 @@ func TestNewWithOptions_ZeroMeansDefault(t *testing.T) {
 
 func TestNewWithOptions_MaxConnectionDuration(t *testing.T) {
 	want := 2 * time.Second
-	a, err := NewWithOptions(func(*request.Request) {}, logger.NewNop(), Options{
+	a, err := NewWithOptions(func(*request.Request) {}, Options{
+		Logger: logger.NewNop(),
 		MaxConnectionDuration: want,
 	})
 	if err != nil {

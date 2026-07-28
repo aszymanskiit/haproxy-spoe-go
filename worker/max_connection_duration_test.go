@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/negasus/haproxy-spoe-go/frame"
-	"github.com/negasus/haproxy-spoe-go/logger"
-	"github.com/negasus/haproxy-spoe-go/request"
+	"github.com/aszymanskiit/haproxy-spoe-go/frame"
+	"github.com/aszymanskiit/haproxy-spoe-go/logger"
+	"github.com/aszymanskiit/haproxy-spoe-go/request"
 )
 
 func TestJitteredMaxConnectionDuration_Range(t *testing.T) {
