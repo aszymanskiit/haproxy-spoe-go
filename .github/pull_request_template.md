@@ -1,23 +1,15 @@
-## Summary
+## Description
 
-<!-- What does this PR change and why? -->
+<!-- What changed and why. Link related issues if any. -->
 
-## Type of change
+## Notes for reviewers
 
-- [ ] Bug fix
-- [ ] New feature / enhancement
-- [ ] Documentation
-- [ ] CI / tooling
-- [ ] Refactor (no intentional behaviour change)
+<!-- Breaking changes, API impact, migration steps, or "n/a". -->
 
-## Checklist
+## How to test
 
-- [ ] `go test ./...` passes locally
-- [ ] `go test -race ./...` passes locally (when applicable)
-- [ ] `go vet ./...` passes
-- [ ] Documentation updated if behaviour or public API changed
-- [ ] Changelog updated for user-visible changes (when applicable)
+<!-- Commands or steps to verify this PR. -->
 
-## Test plan
-
-<!-- How did you verify the change? -->
+```bash
+go test ./...
+```
