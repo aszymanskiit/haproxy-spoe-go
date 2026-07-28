@@ -1,0 +1,170 @@
+name: Validate Commits
+
+on:
+  pull_request:
+  push:
+
+# Read-only: never grant write on untrusted PR code paths.
+permissions:
+  contents: read
+
+jobs:
+  conventional-commits:
+    name: Conventional Commits
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Need enough history to walk the commit range for push and PR events.
+          fetch-depth: 0
+
+      - name: Install pommitlint
+        env:
+          # Go single-binary linter compatible with @commitlint/config-conventional.
+          POMMITLINT_VERSION: v2.0.1
+        run: |
+          set -euo pipefail
+          archive="pommitlint_${POMMITLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL \
+            "https://github.com/shuymn/pommitlint/releases/download/${POMMITLINT_VERSION}/${archive}" \
+            -o /tmp/pommitlint.tgz
+          tar -xzf /tmp/pommitlint.tgz -C /usr/local/bin pommitlint
+          chmod +x /usr/local/bin/pommitlint
+          pommitlint --help >/dev/null
+          echo "Installed pommitlint ${POMMITLINT_VERSION}"
+
+      - name: Determine commit range
+        id: range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          ZERO="0000000000000000000000000000000000000000"
+
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            # Ensure the PR base commit is present for range walking.
+            git fetch --no-tags origin "${PR_BASE}" 2>/dev/null || true
+            FROM="${PR_BASE}"
+            TO="${PR_HEAD}"
+            echo "Event: pull_request (base...head)"
+          elif [[ "${BEFORE}" == "${ZERO}" ]]; then
+            # First push of a new branch: validate commits not already on the default branch.
+            git fetch --no-tags origin "${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}" 2>/dev/null || true
+
+            if git rev-parse --verify "origin/${DEFAULT_BRANCH}" >/dev/null 2>&1; then
+              FROM="$(git merge-base "origin/${DEFAULT_BRANCH}" "${SHA}")"
+              TO="${SHA}"
+
+              if [[ "${FROM}" == "${TO}" ]]; then
+                if git rev-parse --verify "${SHA}^" >/dev/null 2>&1; then
+                  FROM="$(git rev-parse "${SHA}^")"
+                else
+                  FROM=""
+                  TO="${SHA}"
+                  echo "single_commit=true" >> "${GITHUB_OUTPUT}"
+                fi
+              fi
+              echo "Event: push (new branch vs origin/${DEFAULT_BRANCH})"
+            else
+              FROM=""
+              TO="${SHA}"
+              echo "single_commit=true" >> "${GITHUB_OUTPUT}"
+              echo "Event: push (new branch, no default branch ref)"
+            fi
+          else
+            FROM="${BEFORE}"
+            TO="${SHA}"
+            echo "Event: push (before...after)"
+          fi
+
+          echo "from=${FROM}" >> "${GITHUB_OUTPUT}"
+          echo "to=${TO}" >> "${GITHUB_OUTPUT}"
+          echo "Commit range: '${FROM:-<none>}' → '${TO}'"
+
+          if [[ -n "${FROM}" ]]; then
+            echo "Commits to validate:"
+            git log --oneline "${FROM}..${TO}" || true
+          fi
+
+      - name: Lint commits
+        env:
+          FROM: ${{ steps.range.outputs.from }}
+          TO: ${{ steps.range.outputs.to }}
+          SINGLE: ${{ steps.range.outputs.single_commit }}
+        run: |
+          set -euo pipefail
+
+          print_help() {
+            cat <<'EOF'
+
+          Conventional Commits required.
+          Format: <type>[optional scope][optional !]: <description>
+
+          Valid examples:
+            feat: add user authentication
+            fix(api): handle missing authorization header
+            docs: update installation guide
+            refactor!: remove deprecated configuration format
+            feat(payments): support card refunds
+
+            BREAKING CHANGE: the old payment configuration is no longer supported
+
+          Invalid examples:
+            added login
+            small fixes
+            update
+            Fixed bug
+            changes
+
+          See: https://www.conventionalcommits.org/en/v1.0.0/#summary
+          Lint tool: pommitlint (Go), rules compatible with @commitlint/config-conventional.
+          Merge / fixup / squash commits are ignored by default.
+          EOF
+          }
+
+          lint_one() {
+            local hash="$1"
+            local subject message
+            subject="$(git log -1 --format=%s "${hash}")"
+            message="$(git log -1 --format=%B "${hash}")"
+
+            # pommitlint already ignores merge/fixup/squash by default; still
+            # report clearly if a normal commit fails.
+            if ! printf '%s\n' "${message}" | pommitlint lint; then
+              echo "::error::Commit ${hash} failed Conventional Commits validation."
+              echo "Title: ${subject}"
+              return 1
+            fi
+            echo "OK ${hash:0:7}: ${subject}"
+            return 0
+          }
+
+          failed=0
+
+          if [[ "${SINGLE:-}" == "true" ]] || [[ -z "${FROM}" ]]; then
+            echo "Validating single commit ${TO}"
+            if ! lint_one "${TO}"; then
+              failed=1
+            fi
+          else
+            # Exclusive FROM .. inclusive TO — correct for push and pull_request.
+            while IFS= read -r hash; do
+              [[ -z "${hash}" ]] && continue
+              if ! lint_one "${hash}"; then
+                failed=1
+              fi
+            done < <(git rev-list --reverse "${FROM}..${TO}")
+          fi
+
+          if [[ "${failed}" -ne 0 ]]; then
+            print_help
+            exit 1
+          fi

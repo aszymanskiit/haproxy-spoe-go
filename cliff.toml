@@ -1,0 +1,71 @@
+# git-cliff — Conventional Commits → Keep a Changelog style
+# https://git-cliff.org/docs/configuration
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+
+"""
+body = """
+{% if version -%}
+    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+    ## [Unreleased]
+{% endif -%}
+
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim | upper_first }}
+    {% for commit in commits %}
+        - {% if commit.scope %}**{{ commit.scope }}:** {% endif -%}
+          {{ commit.message | split(pat="\n") | first | upper_first | trim }}\
+          {% if commit.breaking %} **[BREAKING]**{% endif -%}
+          {% if commit.id %} ({{ commit.id | truncate(length=7, end="") }}){% endif %}
+    {% endfor %}
+{% endfor %}
+"""
+footer = """
+"""
+trim = true
+render_always = true
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+commit_preprocessors = [
+  # Strip leading emoji / symbols before a Conventional Commits type.
+  { pattern = '^[^a-zA-Z0-9]*', replace = "" },
+  # Strip trailing PR references: " (#123)"
+  { pattern = '\(#([0-9]+)\)', replace = "" },
+]
+commit_parsers = [
+  { message = "^\\w+(\\(.+\\))?!:", group = "<!-- 0 -->Breaking Changes" },
+  { body = "(?i).*breaking change:.*", group = "<!-- 0 -->Breaking Changes" },
+  { message = "^feat", group = "<!-- 1 -->Features" },
+  { message = "^fix", group = "<!-- 2 -->Bug Fixes" },
+  { message = "^perf", group = "<!-- 3 -->Performance" },
+  { message = "^refactor", group = "<!-- 4 -->Refactoring" },
+  { message = "^docs", group = "<!-- 5 -->Documentation" },
+  { message = "^test", group = "<!-- 6 -->Tests" },
+  { message = "^build", group = "<!-- 7 -->Build" },
+  { message = "^ci", group = "<!-- 8 -->CI/CD" },
+  { message = "^chore\\(release\\)", skip = true },
+  { message = "^chore", group = "<!-- 9 -->Miscellaneous" },
+  { message = "^style", group = "<!-- 10 -->Styles" },
+  { message = "^revert", group = "<!-- 11 -->Reverts" },
+  { message = "^Merge ", skip = true },
+  { message = "^merge ", skip = true },
+  { message = "(?i)^changelog$", skip = true },
+  { message = "(?i)^update changelog$", skip = true },
+  { message = ".*", group = "<!-- 12 -->Other" },
+]
+protect_breaking_commits = true
+filter_commits = false
+tag_pattern = "v[0-9].*"
+topo_order = false
+sort_commits = "oldest"

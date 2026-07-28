@@ -1,0 +1,152 @@
+name: Release Changelog
+
+on:
+  release:
+    types: [published]
+
+# Minimal permissions: write CHANGELOG.md and update the release body.
+permissions:
+  contents: write
+
+concurrency:
+  group: release-changelog-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  generate-changelog:
+    name: Generate and publish changelog
+    runs-on: ubuntu-latest
+    if: github.event.release.draft == false
+
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+        with:
+          # Full history + tags required to compute previous→current tag range.
+          fetch-depth: 0
+          fetch-tags: true
+          # Commit CHANGELOG.md on the repository default branch (not a detached tag).
+          ref: ${{ github.event.repository.default_branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve changelog range
+        id: tags
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+
+          # Previous v* tag by version order, excluding the tag being published.
+          PREV="$(git tag --list 'v*' --sort=-version:refname | grep -Fxv "${TAG}" | head -n1 || true)"
+          echo "previous_tag=${PREV}" >> "${GITHUB_OUTPUT}"
+
+          if [[ -n "${PREV}" ]]; then
+            # Exclusive range: commits after PREV up to and including TAG.
+            RANGE="${PREV}..${TAG}"
+          else
+            # First release: all commits reachable from the published tag.
+            RANGE="${TAG}"
+          fi
+          echo "range=${RANGE}" >> "${GITHUB_OUTPUT}"
+
+          echo "Current tag:  ${TAG}"
+          echo "Previous tag: ${PREV:-<none — first release>}"
+          echo "Cliff range:  ${RANGE}"
+
+      - name: Ensure CHANGELOG.md exists
+        run: |
+          set -euo pipefail
+          if [[ ! -f CHANGELOG.md ]]; then
+            printf '%s\n' \
+              '# Changelog' \
+              '' \
+              'All notable changes to this project are documented in this file.' \
+              '' \
+              'The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),' \
+              'and this project adheres to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).' \
+              '' > CHANGELOG.md
+          fi
+
+      - name: Generate release notes
+        id: cliff-notes
+        uses: orhun/git-cliff-action@v4
+        with:
+          version: v2.13.1
+          config: cliff.toml
+          # Range is previous_tag..tag (or tag alone for the first release).
+          # --strip all: body only, for the GitHub Release description.
+          args: >-
+            ${{ steps.tags.outputs.range }}
+            --tag ${{ steps.tags.outputs.tag }}
+            --strip all
+        env:
+          OUTPUT: RELEASE_NOTES.md
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Normalize empty release notes
+        env:
+          TAG: ${{ steps.tags.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ ! -s RELEASE_NOTES.md ]] || [[ -z "$(tr -d '[:space:]' < RELEASE_NOTES.md)" ]]; then
+            {
+              echo "## ${TAG}"
+              echo
+              echo "_No Conventional Commit entries were found in this release range._"
+            } > RELEASE_NOTES.md
+          fi
+
+          echo "----- Release notes preview -----"
+          cat RELEASE_NOTES.md
+          echo "---------------------------------"
+
+      - name: Prepend entry to CHANGELOG.md
+        uses: orhun/git-cliff-action@v4
+        with:
+          version: v2.13.1
+          config: cliff.toml
+          # Prepends the new version section into CHANGELOG.md in place.
+          # --tag sets the version heading for this release fragment.
+          args: >-
+            ${{ steps.tags.outputs.range }}
+            --tag ${{ steps.tags.outputs.tag }}
+            --prepend CHANGELOG.md
+        env:
+          # Action always writes OUTPUT; keep it out of the way of CHANGELOG.md.
+          OUTPUT: .git-cliff-release-fragment.md
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update GitHub Release description
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tags.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release edit "${TAG}" --notes-file RELEASE_NOTES.md
+
+      - name: Commit and push CHANGELOG.md
+        env:
+          TAG: ${{ steps.tags.outputs.tag }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Do not commit temporary fragments produced by git-cliff-action.
+          rm -f .git-cliff-release-fragment.md RELEASE_NOTES.md
+          git add CHANGELOG.md
+
+          if git diff --staged --quiet; then
+            echo "CHANGELOG.md unchanged — nothing to commit."
+            exit 0
+          fi
+
+          # [skip ci] avoids re-running CI for a docs-only changelog commit.
+          # This workflow is triggered only by release:published, so a push
+          # cannot re-enter it (no infinite release loop).
+          git commit -m "chore(release): update CHANGELOG.md for ${TAG} [skip ci]"
+          git push origin "HEAD:${DEFAULT_BRANCH}"
