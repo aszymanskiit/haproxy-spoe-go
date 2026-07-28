@@ -12,13 +12,18 @@ import (
 
 // Client is a simple client for spop protocol, this should only be used for testing purpose
 type Client struct {
-	conn   net.Conn
-	reader io.Reader
+	conn         net.Conn
+	reader       io.Reader
+	maxFrameSize uint32
 }
 
 // NewClient create a new Client for an established connection
 func NewClient(conn net.Conn) Client {
-	return Client{conn: conn, reader: bufio.NewReader(conn)}
+	return Client{
+		conn:         conn,
+		reader:       bufio.NewReader(conn),
+		maxFrameSize: frame.DefaultMaxFrameSize,
+	}
 }
 
 // Init initialize the client by sending the HaproxyHello frame
@@ -29,7 +34,7 @@ func (c *Client) Init() error {
 	f.StreamID = 0
 	f.FrameID = 0
 	f.KV.Add("supported-versions", "2")
-	f.KV.Add("max-frame-size", uint32(16*1024))
+	f.KV.Add("max-frame-size", c.maxFrameSize)
 	f.KV.Add("capabilities", "")
 
 	err := c.send(f)
@@ -39,12 +44,17 @@ func (c *Client) Init() error {
 
 	responseFrame := frame.AcquireFrame()
 	defer frame.ReleaseFrame(responseFrame)
-	responseFrame.Read(c.reader)
+	if err := responseFrame.ReadWithLimit(c.reader, c.maxFrameSize); err != nil {
+		return err
+	}
 
 	switch responseFrame.Type {
 	case frame.TypeAgentHello:
 		if responseFrame.FrameID != uint64(0) || responseFrame.StreamID != uint64(0) {
 			return fmt.Errorf("FrameID or StreamID mismatch")
+		}
+		if responseFrame.MaxFrameSize > 0 && responseFrame.MaxFrameSize < c.maxFrameSize {
+			c.maxFrameSize = responseFrame.MaxFrameSize
 		}
 	default:
 		return fmt.Errorf("unexpected frame type: %v", responseFrame.Type)
@@ -56,16 +66,20 @@ func (c *Client) Init() error {
 
 func (c *Client) send(f *frame.Frame) error {
 	buf := bytes.NewBuffer(make([]byte, 0))
-	n, err := f.Encode(buf)
+	n, err := f.EncodeWithLimit(buf, c.maxFrameSize)
 	if err != nil {
 		return err
 	}
-	n, err = c.conn.Write(buf.Bytes())
-	if err != nil {
-		return err
-	}
-	if n != buf.Len() {
-		return fmt.Errorf("size mismatch")
+	written := 0
+	for written < n {
+		nn, err := c.conn.Write(buf.Bytes()[written:])
+		if err != nil {
+			return err
+		}
+		if nn <= 0 {
+			return fmt.Errorf("short write")
+		}
+		written += nn
 	}
 	return nil
 }
@@ -85,8 +99,7 @@ func (c *Client) Notify() error {
 
 	responseFrame := frame.AcquireFrame()
 	defer frame.ReleaseFrame(responseFrame)
-	responseFrame.Read(c.reader)
-	return nil
+	return responseFrame.ReadWithLimit(c.reader, c.maxFrameSize)
 }
 
 // Stop the client by sending HaproxyDisconnect frame
@@ -106,8 +119,5 @@ func (c *Client) Stop() error {
 
 	responseFrame := frame.AcquireFrame()
 	defer frame.ReleaseFrame(responseFrame)
-	responseFrame.Read(c.reader)
-
-	return nil
-
+	return responseFrame.ReadWithLimit(c.reader, c.maxFrameSize)
 }

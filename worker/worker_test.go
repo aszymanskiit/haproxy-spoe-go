@@ -82,24 +82,32 @@ func TestWorkerConcurrent(t *testing.T) {
 		Handle(server2, m.Handle, logger.NewNop())
 	}()
 	duration := time.Second
+	errCh := make(chan error, 2)
 	loop := func(s client.Client) {
-		if s.Init() != nil {
-			t.Fatal("unexpected error on Init")
+		if err := s.Init(); err != nil {
+			errCh <- err
+			return
 		}
+		deadline := time.After(duration)
 		for {
 			select {
-			case <-time.After(duration):
-				s.Stop()
+			case <-deadline:
+				_ = s.Stop()
+				errCh <- nil
+				return
 			default:
-				s.Notify()
+				_ = s.Notify()
 			}
 		}
 	}
 	go loop(spoe)
 	go loop(spoe2)
 
-	// Let's wait a bit to have everything finished
-	<-time.After(duration)
+	for i := 0; i < 2; i++ {
+		if err := <-errCh; err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
 }
 
 /*
@@ -175,8 +183,9 @@ func TestWorkerNotifyInFlightOnDisconnect(t *testing.T) {
 	frame.ReleaseFrame(hello)
 
 	resp := frame.AcquireFrame()
-	// frame.Read does not parse AgentHello payload and returns an error; ignore it.
-	_ = resp.Read(reader)
+	if err := resp.ReadWithLimit(reader, 16*1024); err != nil {
+		t.Fatalf("read AgentHello: %v", err)
+	}
 	if resp.Type != frame.TypeAgentHello {
 		t.Fatalf("unexpected response type: got %v, want AgentHello", resp.Type)
 	}
@@ -207,8 +216,10 @@ func TestWorkerNotifyInFlightOnDisconnect(t *testing.T) {
 	_ = clientConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	for i := 0; i < 2; i++ {
 		f := frame.AcquireFrame()
-		// Ignore errors: frame.Read returns an error for Agent* frames after consuming the payload.
-		_ = f.Read(reader)
+		if err := f.ReadWithLimit(reader, 16*1024); err != nil {
+			frame.ReleaseFrame(f)
+			break
+		}
 		switch f.Type {
 		case frame.TypeAgentAck:
 			gotAck = true

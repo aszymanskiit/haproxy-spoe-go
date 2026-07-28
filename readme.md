@@ -68,7 +68,21 @@ func main() {
 	}
 	defer listener.Close()
 
-	a := agent.New(handler, logger.NewDefaultLog())
+	// MaxFrameSize is optional. agent.New(...) is enough for most setups and
+	// uses the default (16380). Use NewWithOptions only when you need a custom
+	// local limit for the first HAPROXY-HELLO. After HELLO, HAProxy's announced
+	// max-frame-size is used for the connection:
+	//
+	//   spoe-agent myagent
+	//       max-frame-size 16380
+	//
+	a, err := agent.NewWithOptions(handler, logger.NewDefaultLog(), agent.Options{
+		MaxFrameSize: 16380, // optional; 0 or omitted via agent.New → default 16380; must be >= 256 if set
+	})
+	if err != nil {
+		log.Printf("error create agent: %v", err)
+		os.Exit(1)
+	}
 
 	if err := a.Serve(listener); err != nil {
 		log.Printf("error agent serve: %+v\n", err)
@@ -107,7 +121,44 @@ func handler(req *request.Request) {
 }
 ```
 
+## Frame size limits (security)
+
+SPOP frames are prefixed with an untrusted 4-byte length. This library always
+applies a finite maximum before allocating or reading a payload:
+
+1. **Local limit** — optional `Options.MaxFrameSize` (default `16380`, minimum
+   `256`) bounds only the first `HAPROXY-HELLO`. Omit it / use `agent.New` for
+   the default. There is no unlimited mode; `0` also selects the default.
+   Size a custom value so a legitimate HELLO fits.
+2. **HAProxy limit** — after a valid HELLO, `AGENT-HELLO` echoes HAProxy's
+   `max-frame-size`, and that value is used for all later inbound and outbound
+   frames on the connection. Invalid or missing peer values cause a controlled
+   disconnect.
+
+Pointing an **HTTP** Kubernetes/load-balancer probe at the binary SPOP port
+produces errors such as `unexpected frame type 47` (`'G'` from `GET /`). That
+is expected: use a **TCP** probe on the SPOP port, or expose a separate HTTP
+port for readiness/liveness. Correct probe configuration is operational
+hygiene; the library itself rejects oversized frames even when the frame type
+is a valid SPOP type (for example a crafted `NOTIFY` with a huge length).
+
 ## API
+
+### Agent options
+
+`MaxFrameSize` is **optional**. Most applications can keep using `agent.New`:
+
+```go
+a := agent.New(handler, log) // uses default MaxFrameSize (16380)
+```
+
+Set it only when you need a custom local limit for the first `HAPROXY-HELLO`:
+
+```go
+a, err := agent.NewWithOptions(handler, log, agent.Options{
+    MaxFrameSize: 16380, // optional; 0 selects the default; if set, must be >= 256
+})
+```
 
 ### Messages
 
