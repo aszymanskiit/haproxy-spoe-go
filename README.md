@@ -71,14 +71,17 @@ Based on the current code:
 - Advertised capabilities: `pipelining`, `async`
 - Concurrent `NOTIFY` handling with serialized writes per connection
 - Graceful drain of in-flight notify handlers before connection close
+- Optional max connection lifetime with random jitter (`base + 0..30%`)
 - Request handlers with decoded messages and typed KV arguments
 - Response actions: `SetVar` / `UnsetVar` across HAProxy variable scopes
 - Typed data encode/decode (null, bool, integers, IPv4/IPv6, string, binary)
 - Pluggable `logger.Logger` (default, custom, nop, channel)
 - Optional local max-frame-size for the first HELLO; peer limit afterwards
+- `worker.Options` for low-level tuning (`MaxFrameSize`, `MaxConnectionDuration`, `Logger`)
 - Rejection of oversized / malformed frames and hardened parsers
 - SPOP healthcheck hello support
 - Treats peer connection reset / pipe errors as normal close (HAProxy 3.x)
+- On oversized ACK, sends `AGENT-DISCONNECT` and forces connection close path
 - Test-oriented `client` package and fuzz tests for parsers
 - No TLS termination inside the library (place TLS at the network edge if needed)
 
@@ -174,11 +177,23 @@ A complete runnable example (with sample HAProxy/SPOE configs) lives in
 go run ./examples/ip-reputation
 ```
 
-Custom local frame limit (optional):
+Custom local frame limit and connection rotation (optional):
 
 ```go
 a, err := agent.NewWithOptions(handler, logger.NewDefaultLog(), agent.Options{
 	MaxFrameSize: 16380, // 0 selects default 16380; must be >= 256 if set
+	// Keep connection for at least 2m, plus random jitter up to +30%.
+	MaxConnectionDuration: 2 * time.Minute,
+})
+```
+
+If you use the low-level `worker` API directly, logger is now part of options:
+
+```go
+worker.HandleWithOptions(conn, handler, worker.Options{
+	MaxFrameSize:          16380,
+	MaxConnectionDuration: 2 * time.Minute,
+	Logger:                logger.NewDefaultLog(),
 })
 ```
 

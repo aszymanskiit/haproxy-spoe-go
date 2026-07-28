@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/negasus/haproxy-spoe-go/frame"
 	"github.com/negasus/haproxy-spoe-go/request"
@@ -36,6 +37,7 @@ func (w *worker) processNotifyFrame(f *frame.Frame) {
 		if errors.Is(err, frame.ErrFrameTooLarge) {
 			// ACK exceeded negotiated max-frame-size; notify peer then close path via log.
 			_ = w.sendAgentDisconnect(0, 0, statusFrameTooBig, "ack frame too big")
+			_ = w.conn.SetReadDeadline(time.Now()) // force connection close
 		}
 		w.logger.Errorf("ack frame write failed: %v", err)
 	}

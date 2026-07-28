@@ -2,6 +2,7 @@ package agent
 
 import (
 	"testing"
+	"time"
 
 	"github.com/negasus/haproxy-spoe-go/frame"
 	"github.com/negasus/haproxy-spoe-go/logger"
@@ -29,5 +30,18 @@ func TestNewWithOptions_ZeroMeansDefault(t *testing.T) {
 	}
 	if a.MaxFrameSize() != frame.DefaultMaxFrameSize {
 		t.Fatalf("got %d, want default", a.MaxFrameSize())
+	}
+}
+
+func TestNewWithOptions_MaxConnectionDuration(t *testing.T) {
+	want := 2 * time.Second
+	a, err := NewWithOptions(func(*request.Request) {}, logger.NewNop(), Options{
+		MaxConnectionDuration: want,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.MaxConnectionDuration() != want {
+		t.Fatalf("got %s, want %s", a.MaxConnectionDuration(), want)
 	}
 }

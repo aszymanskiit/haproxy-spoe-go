@@ -3,6 +3,7 @@ package agent
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/negasus/haproxy-spoe-go/frame"
 	"github.com/negasus/haproxy-spoe-go/logger"
@@ -24,6 +25,11 @@ type Options struct {
 	//
 	// A value of 0 selects the library default; there is no "unlimited" mode.
 	MaxFrameSize uint32
+
+	// MaxConnectionDuration configures graceful worker-side connection rotation.
+	// When > 0, a connection is kept for at least this duration plus a random
+	// jitter of up to 30% of the base value. When 0, connection lifetime is unlimited.
+	MaxConnectionDuration time.Duration
 }
 
 func New(handler func(*request.Request), logger logger.Logger) *Agent {
@@ -49,21 +55,28 @@ func NewWithOptions(handler func(*request.Request), logger logger.Logger, opts O
 	}
 
 	return &Agent{
-		handler:      handler,
-		logger:       logger,
-		maxFrameSize: opts.MaxFrameSize,
+		handler:               handler,
+		logger:                logger,
+		maxFrameSize:          opts.MaxFrameSize,
+		maxConnectionDuration: opts.MaxConnectionDuration,
 	}, nil
 }
 
 type Agent struct {
-	handler      func(*request.Request)
-	logger       logger.Logger
-	maxFrameSize uint32
+	handler               func(*request.Request)
+	logger                logger.Logger
+	maxFrameSize          uint32
+	maxConnectionDuration time.Duration
 }
 
 // MaxFrameSize returns the configured local maximum frame size.
 func (agent *Agent) MaxFrameSize() uint32 {
 	return agent.maxFrameSize
+}
+
+// MaxConnectionDuration returns the configured minimum connection lifetime.
+func (agent *Agent) MaxConnectionDuration() time.Duration {
+	return agent.maxConnectionDuration
 }
 
 func (agent *Agent) Serve(listener net.Listener) error {
@@ -76,6 +89,10 @@ func (agent *Agent) Serve(listener net.Listener) error {
 			return err
 		}
 
-		go worker.HandleWithMaxFrameSize(conn, agent.handler, agent.logger, agent.maxFrameSize)
+		go worker.HandleWithOptions(conn, agent.handler, worker.Options{
+			MaxFrameSize:          agent.maxFrameSize,
+			MaxConnectionDuration: agent.maxConnectionDuration,
+			Logger:                agent.logger,
+		})
 	}
 }
