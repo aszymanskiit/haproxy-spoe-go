@@ -1,3 +1,12 @@
 .idea
 .debug
 coverage.txt
+coverage.out
+*.exe
+*.test
+*.out
+bin/
+dist/
+
+# Accidental local example binaries built into the repo root
+/ip-reputation

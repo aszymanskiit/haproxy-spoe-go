@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: HAProxy SPOE specification
+    url: https://www.haproxy.org/download/2.8/doc/SPOE.txt
+    about: Official SPOE/SPOP protocol documentation
+  - name: Upstream repository
+    url: https://github.com/negasus/haproxy-spoe-go
+    about: Original project this fork is based on

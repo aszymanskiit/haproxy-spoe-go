@@ -1,0 +1,76 @@
+name: Bug report
+description: Report a defect or unexpected behaviour in this library
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+        Please do **not** use public issues for security vulnerabilities — see [SECURITY.md](../../SECURITY.md).
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: A clear and concise description of the problem.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps or a small code sample that reproduces the issue.
+      placeholder: |
+        1. Start the agent with ...
+        2. Configure HAProxy with ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include relevant log lines when available (redact sensitive data).
+    validations:
+      required: true
+
+  - type: input
+    id: go-version
+    attributes:
+      label: Go version
+      placeholder: go version
+    validations:
+      required: true
+
+  - type: input
+    id: library-version
+    attributes:
+      label: Library version / commit
+      description: Tag, pseudo-version, or commit SHA of this fork.
+    validations:
+      required: true
+
+  - type: input
+    id: haproxy-version
+    attributes:
+      label: HAProxy version (if applicable)
+      placeholder: haproxy -v
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: OS, deployment notes, related PRs, or anything else that may help.
+    validations:
+      required: false
