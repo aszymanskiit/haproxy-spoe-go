@@ -2,11 +2,33 @@ package worker
 
 import (
 	"fmt"
+	"time"
 
-	"github.com/negasus/haproxy-spoe-go/frame"
+	"github.com/aszymanskiit/haproxy-spoe-go/frame"
 )
 
+func (w *worker) processHaproxyDisconnect(f *frame.Frame) error {
+	defer frame.ReleaseFrame(f)
+
+	if !w.ready {
+		return fmt.Errorf("worker not ready, but got HaproxyDisconnect frame")
+	}
+
+	if err := w.sendAgentDisconnect(0, 0, statusNormal, "connection closed by server"); err != nil {
+		return fmt.Errorf("error send AgentDisconnect frame: %w", err)
+	}
+
+	return nil
+}
+
 func (w *worker) sendAgentDisconnect(streamID, frameID uint64, statusCode uint32, message string) error {
+	defer func() {
+		// force connection close
+		if err := w.conn.SetReadDeadline(time.Now()); err != nil {
+			w.logger.Errorf("set read deadline: %v", err)
+		}
+	}()
+
 	agentDisconnectFrame := frame.AcquireFrame()
 	defer frame.ReleaseFrame(agentDisconnectFrame)
 

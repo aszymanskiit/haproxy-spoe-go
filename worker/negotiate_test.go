@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/negasus/haproxy-spoe-go/action"
-	"github.com/negasus/haproxy-spoe-go/frame"
-	"github.com/negasus/haproxy-spoe-go/logger"
-	"github.com/negasus/haproxy-spoe-go/request"
+	"github.com/aszymanskiit/haproxy-spoe-go/action"
+	"github.com/aszymanskiit/haproxy-spoe-go/frame"
+	"github.com/aszymanskiit/haproxy-spoe-go/logger"
+	"github.com/aszymanskiit/haproxy-spoe-go/request"
 )
 
 func readFrame(t *testing.T, r io.Reader, limit uint32) *frame.Frame {

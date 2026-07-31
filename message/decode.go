@@ -2,7 +2,8 @@ package message
 
 import (
 	"fmt"
-	"github.com/negasus/haproxy-spoe-go/varint"
+
+	"github.com/aszymanskiit/haproxy-spoe-go/varint"
 )
 
 func (m *Messages) Decode(buf []byte) error {

@@ -1,0 +1,28 @@
+services:
+  echo-server:
+    image: openresty/openresty:alpine
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+
+  # SPOA agent (Go) uruchamiany w kontenerze
+  iprep-agent:
+    image: golang:1.25-alpine
+    working_dir: /src
+    command: sh -c "go run ./examples/ip-reputation"
+    volumes:
+      - ../..:/src
+    expose:
+      - "3000"
+
+  haproxy:
+    image: haproxytech/haproxy-alpine:2.8.3
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+      - ./spoe-ip-reputation.conf:/usr/local/etc/haproxy/spoe-ip-reputation.conf
+    depends_on:
+      - echo-server
+      - iprep-agent
