@@ -122,8 +122,8 @@ Imports in application code stay unchanged:
 
 ```go
 import (
-    "github.com/negasus/haproxy-spoe-go/agent"
-    "github.com/negasus/haproxy-spoe-go/request"
+    "github.com/aszymanskiit/haproxy-spoe-go/agent"
+    "github.com/aszymanskiit/haproxy-spoe-go/request"
 )
 ```
 
@@ -137,10 +137,10 @@ import (
 	"net"
 	"os"
 
-	"github.com/negasus/haproxy-spoe-go/action"
-	"github.com/negasus/haproxy-spoe-go/agent"
-	"github.com/negasus/haproxy-spoe-go/logger"
-	"github.com/negasus/haproxy-spoe-go/request"
+	"github.com/aszymanskiit/haproxy-spoe-go/action"
+	"github.com/aszymanskiit/haproxy-spoe-go/agent"
+	"github.com/aszymanskiit/haproxy-spoe-go/logger"
+	"github.com/aszymanskiit/haproxy-spoe-go/request"
 )
 
 func main() {
