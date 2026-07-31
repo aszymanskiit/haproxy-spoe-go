@@ -46,8 +46,8 @@ jobs:
             # Exclusive range: commits after PREV up to and including TAG.
             RANGE="${PREV}..${TAG}"
           else
-            # First release: all commits reachable from the published tag.
-            RANGE="${TAG}"
+            # First release: no range — git-cliff processes all commits.
+            RANGE=""
           fi
           echo "range=${RANGE}" >> "${GITHUB_OUTPUT}"
 
