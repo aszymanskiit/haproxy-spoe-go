@@ -112,6 +112,7 @@ jobs:
           args: >-
             ${{ steps.tags.outputs.range }}
             --tag ${{ steps.tags.outputs.tag }}
+            --latest
             --prepend CHANGELOG.md
         env:
           # Action always writes OUTPUT; keep it out of the way of CHANGELOG.md.
