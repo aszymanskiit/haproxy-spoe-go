@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## [1.0.9] - 2026-08-03
+
+### Miscellaneous
+
+- Remove old changelog (a53a852)
+
+- Remove unnecessary logs (64d4723)
+
 ## [1.0.8] - 2026-07-31
 
 ### Features
