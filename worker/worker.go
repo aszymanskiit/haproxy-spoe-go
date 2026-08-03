@@ -139,8 +139,6 @@ func (w *worker) run() error {
 		close(w.writeCh)
 		<-writerDone
 		w.close()
-
-		w.logger.Errorf("worker closed connection")
 	}()
 
 	var f *frame.Frame
